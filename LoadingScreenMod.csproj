@@ -1,0 +1,70 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>LoadingScreenMod</AssemblyName>
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <TargetFramework>net35</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup>
+    <LangVersion>Preview</LangVersion>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup />
+  <ItemGroup />
+  <PropertyGroup>
+    <ManagedDLLPath>../dependencies</ManagedDLLPath>
+    <SteamPath>~/Library/Application Support/Steam/</SteamPath>
+    <SteamPath Condition="! Exists ('$(SteamPath)')">C:/Games/Steam</SteamPath>
+    <SteamPath Condition="! Exists ('$(SteamPath)')">$(ProgramFiles)/Steam</SteamPath>
+    <SteamPath Condition="! Exists ('$(SteamPath)')">$(Registry:HKEY_CURRENT_USER\Software\Valve\Steam@SteamPath)</SteamPath>
+    <CSPath>$(SteamPath)/steamapps/common/Cities_Skylines</CSPath>
+    <ManagedDLLPath Condition="!  Exists ('$(ManagedDLLPath)')">$(CSPath)/Cities_Data/Managed</ManagedDLLPath>
+    <AssemblySearchPaths>
+      $(AssemblySearchPaths);
+      $(ManagedDLLPath);
+      ../libs/
+    </AssemblySearchPaths>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <Reference>
+      <Private>False</Private>
+    </Reference>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <Reference Include="ColossalManaged" />
+    <Reference Include="UnityEngine" />
+    <Reference Include="Assembly-CSharp" />
+    <Reference Include="ICities" />
+  </ItemGroup>
+  <Target Name="DeployToModDirectory" AfterTargets="Build">
+    <Message Importance="high" Text="DeployToModDirectory ..." />
+    <GetAssemblyIdentity AssemblyFiles="$(TargetPath)">
+      <Output TaskParameter="Assemblies" ItemName="Targets" />
+    </GetAssemblyIdentity>
+    <ItemGroup>
+      <VersionNumber Include="@(Targets->'%(Version)')" />
+    </ItemGroup>
+    <PropertyGroup>
+      <DeployDir Condition="'$(DeployDir)'==''">$(LOCALAPPDATA)/Colossal Order/Cities_Skylines/Addons/Mods/$(SolutionName)/</DeployDir>
+      <Now>$([System.DateTime]::Now.ToString("HH:mm:ss"))</Now>
+      <ZipFileName>$(SolutionName)-V@(VersionNumber)-$(GitCommit)-$(Configuration).zip</ZipFileName>
+      <ZipFile>$(DeployDir)/../$(ZipFileName)</ZipFile>
+    </PropertyGroup>
+    <ItemGroup>
+      <OldZipFiles Include="$(DeployDir)/../$(SolutionName)-*-$(Configuration).zip" />
+    </ItemGroup>
+    <Delete Files="$(DeployDir)$(TargetFileName)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(DeployDir)" />
+    <Message Importance="high" Text="AssemblyVersion=@(VersionNumber) time=$(Now)" />
+    <Delete Files="@(OldZipFiles)" />
+    <ZipDirectory SourceDirectory="$(DeployDir)" DestinationFile="$(ZipFile)" />
+  </Target>
+  <Target Name="CustomClean" BeforeTargets="CoreClean">
+    <RemoveDir Directories="$(TargetDir)" />
+    <PropertyGroup>
+      <DeployDir>$(LOCALAPPDATA)/Colossal Order/Cities_Skylines/Addons/Mods/$(SolutionName)/</DeployDir>
+    </PropertyGroup>
+    <Message Text="removing deploy directory" Importance="high" />
+    <RemoveDir Directories="$(DeployDir)" />
+  </Target>
+</Project>
