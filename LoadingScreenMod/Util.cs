@@ -10,7 +10,7 @@ namespace LoadingScreenMod
 	{
 		public static void DebugPrint(params object[] args)
 		{
-			Console.WriteLine("[LSM] " + " ".OnJoin(args));
+			UnityEngine.Debug.Log("[LSM] " + " ".OnJoin(args));
 		}
 
 		public static string OnJoin(this string delim, IEnumerable<object> args)

@@ -383,7 +383,7 @@ namespace LoadingScreenMod
 			catch (Exception)
 			{
 			}
-			Console.WriteLine(fullName);
+			Debug.Log(fullName);
 		}
 
 		internal void LoadImpl(Package.Asset assetRef)
