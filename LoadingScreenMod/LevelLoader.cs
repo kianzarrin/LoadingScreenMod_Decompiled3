@@ -377,16 +377,19 @@ namespace LoadingScreenMod
 						yield return null;
 					}
 					lm.m_loadingProfilerScenes.EndLoading();
+					Debug.Log($"[LSM-DEBUG] {uiScene} EndLoading");
 				}
 				lm.m_loadedEnvironment = Singleton<SimulationManager>.instance.m_metaData.m_environment;
 				lm.m_loadedMapTheme = Singleton<SimulationManager>.instance.m_metaData.m_MapThemeMetaData?.name;
-				if (optimizeThumbs)
+				Debug.Log($"[LSM-DEBUG] if(optimizeThumbs)");
+				if(optimizeThumbs)
 				{
 					Instance<CustomDeserializer>.instance.ReceiveRemaining();
 				}
 			}
 			else
 			{
+				Debug.Log($"[LSM-DEBUG] GetLoadingScene()");
 				string key = (string)Util.Invoke(lm, "GetLoadingScene");
 				if (!string.IsNullOrEmpty(key))
 				{
@@ -396,32 +399,41 @@ namespace LoadingScreenMod
 				}
 			}
 			lm.SetSceneProgress(1f);
+			Debug.Log($"[LSM-DEBUG] polling LoadSimulationData task");
 			while (!task.completedOrFailed)
 			{
-				if (!simulationFailed && (i++ & 7) == 0)
+				Debug.Log($"[LSM-DEBUG] polling LoadSimulationData task {i}");
+				if(!simulationFailed && (i++ & 7) == 0)
 				{
 					simulationFailed = HasFailed(task);
 				}
 				yield return null;
 			}
-			if (!simulationFailed)
+			Debug.Log($"[LSM-DEBUG] if(!simulationFailed)");
+			if(!simulationFailed)
 			{
 				simulationFailed = HasFailed(task);
 			}
 			lm.m_simulationDataLoaded = lm.m_metaDataLoaded;
+			Debug.Log($"[LSM-DEBUG] before invoking m_simulationDataReady");
 			(Util.Get(lm, "m_simulationDataReady") as LoadingManager.SimulationDataReadyHandler)?.Invoke();
 			SimulationManager.UpdateMode updateMode = SimulationManager.UpdateMode.Undefined;
 			if (ngs != null)
 			{
 				updateMode = ngs.m_updateMode;
 			}
+			Debug.Log($"[LSM-DEBUG] Enqueuing LSM.CheckPolicies()");
 			lm.QueueLoadingAction(CheckPolicies());
 			if (Settings.settings.Removals)
 			{
+				Debug.Log($"[LSM-DEBUG] Enqueuing LSM.Safenets.Removals()");
 				lm.QueueLoadingAction(Safenets.Removals());
 			}
+			Debug.Log($"[LSM-DEBUG] Enqueuing LoadingManger.LoadLevelComplete()");
 			lm.QueueLoadingAction((IEnumerator)Util.Invoke(lm, "LoadLevelComplete", updateMode));
+			Debug.Log($"[LSM-DEBUG] Disposign PrefabLoader");
 			Instance<PrefabLoader>.instance?.Dispose();
+			Debug.Log($"[LSM-DEBUG] Enqueuing LSM.LoadingComplete()");
 			lm.QueueLoadingAction(LoadingComplete());
 			knownFastLoads[asset.checksum] = true;
 			AssetLoader.PrintMem();
@@ -441,6 +453,7 @@ namespace LoadingScreenMod
 
 		private IEnumerator CheckPolicies()
 		{
+			Debug.Log($"[LSM-DEBUG] CheckPolicies() called");
 			PoliciesPanel policiesPanel = ToolsModifierControl.policiesPanel;
 			if ((object)policiesPanel != null)
 			{
@@ -461,6 +474,7 @@ namespace LoadingScreenMod
 			{
 				Util.DebugPrint("PoliciesPanel is null. Cannot initialize it at", Profiling.Millis);
 			}
+			Debug.Log($"[LSM-DEBUG] CheckPolicies() ended");
 			yield break;
 		}
 

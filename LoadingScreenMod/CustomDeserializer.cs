@@ -1390,11 +1390,13 @@ namespace LoadingScreenMod
 
 		internal void ReceiveRemaining()
 		{
+			Debug.Log("[LSM-DEBUG] ReceiveRemaining() called");
 			AtlasObj result;
 			while (atlasOut.Dequeue(out result))
 			{
 				ReceiveAtlas(result);
 			}
+			Debug.Log("[LSM-DEBUG] ReceiveRemaining() done");
 		}
 
 		private static void ReceiveAtlas(AtlasObj ao)

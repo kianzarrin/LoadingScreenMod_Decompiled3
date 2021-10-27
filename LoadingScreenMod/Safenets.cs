@@ -203,11 +203,13 @@ namespace LoadingScreenMod
 
 		internal static IEnumerator Removals()
 		{
+			Debug.Log($"[LSM-DEBUG] Removals() called");
 			AsyncAction task = Singleton<SimulationManager>.instance.AddAction(RemoveNow);
 			while (!task.completedOrFailed)
 			{
 				yield return null;
 			}
+			Debug.Log($"[LSM-DEBUG] Removals() ended");
 		}
 
 		private static void RemoveNow()
