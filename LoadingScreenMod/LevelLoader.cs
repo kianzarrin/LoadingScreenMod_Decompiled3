@@ -179,7 +179,7 @@ namespace LoadingScreenMod
 				lm.m_loadingProfilerScenes.EndLoading();
 			}
 			DateTime skipStamp = Settings.settings.LoadSkipFile();
-			AsyncTask task = (AsyncTask)(LoadSaveStatus.activeTask = Singleton<SimulationManager>.instance.AddAction("Loading", (IEnumerator)Util.Invoke(lm, "LoadSimulationData", asset, ngs)));
+			AsyncTask task = (AsyncTask)(LoadSaveStatus.activeTask = Singleton<SimulationManager>.instance.AddAction("Loading", AssetDeserializer.LoadSimulationData(asset,ngs)));
 			if (lm.m_loadedEnvironment == null)
 			{
 				fastLoad = false;

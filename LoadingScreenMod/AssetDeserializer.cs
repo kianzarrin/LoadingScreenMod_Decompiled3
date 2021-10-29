@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
@@ -444,7 +445,7 @@ namespace LoadingScreenMod
 			return text;
 		}
 
-		public static void LoadSimulationData(Package.Asset asset, SimulationMetaData ngs) {
+		public static IEnumerator LoadSimulationData(Package.Asset asset, SimulationMetaData ngs) {
 			LoadingManager lm = Singleton<LoadingManager>.instance;
 			lm.SetSimulationProgress(0f);
 			lm.m_loadingProfilerSimulation.BeginLoading("Deserialize");
@@ -534,6 +535,8 @@ namespace LoadingScreenMod
 				SimulationManager.Managers_LateUpdateData(mode, 0.95f, 1f);
 			}
 			lm.SetSimulationProgress(1f);
+			yield return 0;
+			yield break;
 		}
 
 		private static void CheckMetaData(SimulationMetaData meta) {
