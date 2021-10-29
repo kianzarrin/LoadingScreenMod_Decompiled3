@@ -1,8 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Threading;
 using ColossalFramework;
 using ColossalFramework.Importers;
+using ColossalFramework.IO;
 using ColossalFramework.Packaging;
 using UnityEngine;
 
@@ -439,6 +442,127 @@ namespace LoadingScreenMod
 			string text = PackageHelper.ResolveLegacyMemberHandler(classType, member);
 			CODebugBase<InternalLogChannel>.Warn(InternalLogChannel.Packer, "Unkown member detected of type " + fieldType.FullName + " in " + classType.FullName + ". Attempting to resolve from '" + member + "' to '" + text + "'");
 			return text;
+		}
+
+		public static void LoadSimulationData(Package.Asset asset, SimulationMetaData ngs) {
+			LoadingManager lm = Singleton<LoadingManager>.instance;
+			lm.SetSimulationProgress(0f);
+			lm.m_loadingProfilerSimulation.BeginLoading("Deserialize");
+			lm.m_loadingProfilerSimulation.PauseLoading();
+			Singleton<PathManager>.instance.WaitForAllPaths();
+			lm.m_loadingProfilerSimulation.ContinueLoading();
+			SimulationManager.Managers_EarlyUpdateData();
+			if(asset == null) {
+				Debug.Log($"[LSM-DEBUG] asset is null");
+				Singleton<SimulationManager>.instance.m_metaData = new SimulationMetaData();
+				Singleton<SimulationManager>.instance.m_metaData.m_environment = "Sunny";
+				Singleton<SimulationManager>.instance.m_metaData.Merge(ngs);
+				CheckMetaData(Singleton<SimulationManager>.instance.m_metaData);
+				lm.m_metaDataLoaded = true;
+			} else {
+				Stream stream = asset.GetStream();
+				if(stream == null) {
+					throw new Exception("Failed to get stream!");
+				}
+				CODebugBase<LogChannel>.Log(LogChannel.Serialization, "Loading simulation data from: " + asset.name);
+				using(stream) {
+					long position = stream.Position;
+					uint num = (uint)((uint)stream.ReadByte() << 24);
+					num |= (uint)((uint)stream.ReadByte() << 16);
+					num |= (uint)((uint)stream.ReadByte() << 8);
+					num |= (uint)stream.ReadByte();
+					stream.Position = position;
+					if(num > 113015U) {
+						throw new Exception(string.Concat(new object[]
+						{
+					"File format version not supported (",
+					num,
+					" > ",
+					113015U,
+					")!"
+						}));
+					}
+					if(num < 139U) {
+						Debug.Log($"[LSM-DEBUG] new SimulationMetaData()");
+						Singleton<SimulationManager>.instance.m_metaData = new SimulationMetaData();
+						Singleton<SimulationManager>.instance.m_metaData.m_environment = "Sunny";
+						Singleton<SimulationManager>.instance.m_metaData.m_gameInstanceIdentifier = Guid.NewGuid().ToString();
+					} else {
+						Debug.Log($"[LSM-DEBUG] start Deserialize<SimulationMetaData>");
+						Singleton<SimulationManager>.instance.m_metaData = DataSerializer.Deserialize<SimulationMetaData>(stream, DataSerializer.Mode.File);
+						Debug.Log($"[LSM-DEBUG] finished Deserialize<SimulationMetaData>");
+					}
+					Debug.Log($"[LSM-DEBUG] Merge(ngs)");
+					Singleton<SimulationManager>.instance.m_metaData.Merge(ngs);
+					Debug.Log($"[LSM-DEBUG] CheckMetaData");
+					CheckMetaData(Singleton<SimulationManager>.instance.m_metaData);
+					lm.m_metaDataLoaded = true;
+					lm.SetSimulationProgress(0.5f);
+					Debug.Log($"[LSM-DEBUG] Deserialize<SimulationManager.Data>");
+					DataSerializer.Deserialize<SimulationManager.Data>(stream, DataSerializer.Mode.File);
+				}
+				CODebugBase<LogChannel>.Log(LogChannel.Serialization, "Loaded simulation data from: " + asset.name);
+			}
+			lm.m_loadingProfilerSimulation.EndLoading();
+			lm.SetSimulationProgress(0.73f);
+			lm.m_loadingProfilerSimulation.BeginLoading("BindPrefabs");
+			lm.WaitUntilEssentialScenesLoaded();
+			PrefabCollection<NetInfo>.BindPrefabs();
+			PrefabCollection<BuildingInfo>.BindPrefabs();
+			PrefabCollection<PropInfo>.BindPrefabs();
+			PrefabCollection<TreeInfo>.BindPrefabs();
+			PrefabCollection<TransportInfo>.BindPrefabs();
+			PrefabCollection<VehicleInfo>.BindPrefabs();
+			PrefabCollection<CitizenInfo>.BindPrefabs();
+			PrefabCollection<EventInfo>.BindPrefabs();
+			PrefabCollection<DisasterInfo>.BindPrefabs();
+			PrefabCollection<RadioChannelInfo>.BindPrefabs();
+			PrefabCollection<RadioContentInfo>.BindPrefabs();
+			lm.m_loadingProfilerSimulation.EndLoading();
+			lm.SetSimulationProgress(0.74f);
+			SimulationManager.UpdateMode mode = SimulationManager.UpdateMode.Undefined;
+			if(ngs != null) {
+				mode = ngs.m_updateMode;
+			}
+			if(mode == SimulationManager.UpdateMode.NewGameFromMap || mode == SimulationManager.UpdateMode.NewScenarioFromMap || mode == SimulationManager.UpdateMode.UpdateScenarioFromMap) {
+				SimulationManager.Managers_UpdateData(mode, 0.74f, 0.9f);
+				lm.SetSimulationProgress(0.9f);
+				SimulationManager.Managers_LateUpdateData(mode, 0.9f, 1f);
+			} else {
+				SimulationManager.Managers_UpdateData(mode, 0.74f, 0.95f);
+				lm.SetSimulationProgress(0.95f);
+				SimulationManager.Managers_LateUpdateData(mode, 0.95f, 1f);
+			}
+			lm.SetSimulationProgress(1f);
+		}
+
+		private static void CheckMetaData(SimulationMetaData meta) {
+			if(!string.IsNullOrEmpty(meta.m_ScenarioAsset)) {
+				while(!Monitor.TryEnter(meta, SimulationManager.SYNCHRONIZE_TIMEOUT)) {
+				}
+				try {
+					if(meta.m_modOverride == null) {
+						meta.m_modOverride = new Dictionary<string, bool>();
+					}
+					if(!meta.m_modOverride.ContainsKey("Builtin/HardMode")) {
+						meta.m_modOverride.Add("Builtin/HardMode", false);
+					}
+					if(!meta.m_modOverride.ContainsKey("Builtin/UnlimitedMoney")) {
+						meta.m_modOverride.Add("Builtin/UnlimitedMoney", false);
+					}
+					if(!meta.m_modOverride.ContainsKey("Builtin/UnlockAll")) {
+						meta.m_modOverride.Add("Builtin/UnlockAll", false);
+					}
+					if(!meta.m_modOverride.ContainsKey("Builtin/UnlimitedOilAndOre")) {
+						meta.m_modOverride.Add("Builtin/UnlimitedOilAndOre", false);
+					}
+					if(!meta.m_modOverride.ContainsKey("Builtin/UnlimitedSoil")) {
+						meta.m_modOverride.Add("Builtin/UnlimitedSoil", false);
+					}
+				} finally {
+					Monitor.Exit(meta);
+				}
+			}
 		}
 	}
 }

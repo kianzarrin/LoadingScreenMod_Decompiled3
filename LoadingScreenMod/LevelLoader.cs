@@ -402,13 +402,14 @@ namespace LoadingScreenMod
 			Debug.Log($"[LSM-DEBUG] polling LoadSimulationData task");
 			while (!task.completedOrFailed)
 			{
-				Debug.Log($"[LSM-DEBUG] polling LoadSimulationData task {i}");
+				//Debug.Log($"[LSM-DEBUG] polling LoadSimulationData task {i}");
 				if(!simulationFailed && (i++ & 7) == 0)
 				{
 					simulationFailed = HasFailed(task);
 				}
 				yield return null;
 			}
+			Debug.Log($"[LSM-DEBUG] LoadSimulationData task completed");
 			Debug.Log($"[LSM-DEBUG] if(!simulationFailed)");
 			if(!simulationFailed)
 			{
