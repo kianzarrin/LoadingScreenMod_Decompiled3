@@ -163,8 +163,8 @@ namespace LoadingScreenMod
 		private void LoadPackage(int firstIndex, int lastIndex, Package package, Package.Asset[] q)
 		{
 			loadList.Clear();
-			int num = firstIndex;
-			bool flag;
+			int index = firstIndex;
+			bool canLoad;
 			lock (mutex)
 			{
 				loaderIndex = firstIndex;
@@ -192,9 +192,9 @@ namespace LoadingScreenMod
 					{
 						val.code = (val.code & -262144) | lastIndex;
 						data.Reinsert(checksum);
-						if (num < lastIndex && (object)item == q[num])
+						if (index < lastIndex && (object)item == q[index])
 						{
-							num++;
+							index++;
 						}
 					}
 					else
@@ -202,14 +202,14 @@ namespace LoadingScreenMod
 						loadList.Add(item);
 					}
 				}
-				flag = CanLoad();
+				canLoad = CanLoad();
 			}
 			if (loadList.Count == 0)
 			{
 				return;
 			}
 			using FileStream fileStream = new FileStream(package.packagePath, FileMode.Open, FileAccess.Read, FileShare.Read, 8192);
-			if (!flag)
+			if (!canLoad)
 			{
 				fileStream.Position = loadList[0].offset;
 				lock (mutex)
@@ -221,7 +221,7 @@ namespace LoadingScreenMod
 				}
 			}
 			loadedList.Clear();
-			int code = (lastIndex - num + 1 << 18) | lastIndex;
+			int code = (lastIndex - index + 1 << 18) | lastIndex;
 			int num5 = 0;
 			for (int i = 0; i < loadList.Count; i++)
 			{
@@ -249,16 +249,16 @@ namespace LoadingScreenMod
 					num5 += num9;
 				}
 				loadedList.Add(new Triple(asset2.checksum, bytes, num7));
-				if (num < lastIndex && (object)asset2 == q[num])
+				if (index < lastIndex && (object)asset2 == q[index])
 				{
-					int num10 = num - firstIndex;
+					int num10 = index - firstIndex;
 					if (num10 < 3 || (num10 & 3) == 0)
 					{
 						Send(num5);
 						num5 = 0;
-						code = (lastIndex - num << 18) | lastIndex;
+						code = (lastIndex - index << 18) | lastIndex;
 					}
-					num++;
+					index++;
 				}
 			}
 			Send(num5);
@@ -294,7 +294,7 @@ namespace LoadingScreenMod
 
 		private static int Forward(int index, Package p, Package.Asset[] q)
 		{
-			while (++index < q.Length && (object)p == q[index].package)
+			while (++index < q.Length && p == q[index].package)
 			{
 			}
 			return index - 1;
@@ -303,29 +303,29 @@ namespace LoadingScreenMod
 		private void LoadWorker(object param)
 		{
 			Thread.CurrentThread.Name = "LoadWorker";
-			Package.Asset[] array = (Package.Asset[])param;
+			Package.Asset[] queue = (Package.Asset[])param;
 			loadList = new List<Package.Asset>(64);
 			loadedList = new List<Triple>(64);
-			int num = 0;
-			while (num < array.Length)
+			int index = 0;
+			while (index < queue.Length)
 			{
-				Package package = array[num].package;
-				int num2 = Forward(num, package, array);
+				Package package = queue[index].package;
+				int n = Forward(index, package, queue);
 				try
 				{
-					LoadPackage(num, num2, package, array);
+					LoadPackage(index, n, package, queue);
 				}
 				catch (Exception ex)
 				{
 					Util.DebugPrint("LoadWorker", package.packageName, ex.Message);
 				}
-				mtQueue.Enqueue(new Triple(num2));
-				num = num2 + 1;
+				mtQueue.Enqueue(new Triple(n));
+				index = n + 1;
 			}
 			mtQueue.SetCompleted();
 			loadList = null;
 			loadedList = null;
-			array = null;
+			queue = null;
 		}
 
 		private void MTWorker()
