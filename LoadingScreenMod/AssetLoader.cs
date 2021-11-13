@@ -185,11 +185,11 @@ namespace LoadingScreenMod
 			Singleton<LoadingManager>.instance.m_loadingProfilerCustomAsset.PauseLoading();
 			Instance<LevelLoader>.instance.assetsStarted = true;
 			List<DistrictStyle> districtStyles = new List<DistrictStyle>();
-			HashSet<string> hashSet = new HashSet<string>();
+			HashSet<string> assetnames = new HashSet<string>();
 			FastList<DistrictStyleMetaData> districtStyleMetaDatas = new FastList<DistrictStyleMetaData>();
 			FastList<Package> districtStylePackages = new FastList<Package>();
-			Package.Asset asset = PackageManager.FindAssetByName("System." + DistrictStyle.kEuropeanStyleName);
-			if (asset != null && asset.isEnabled)
+			Package.Asset styleAsset = PackageManager.FindAssetByName("System." + DistrictStyle.kEuropeanStyleName);
+			if (styleAsset != null && styleAsset.isEnabled)
 			{
 				DistrictStyle districtStyle = new DistrictStyle(DistrictStyle.kEuropeanStyleName, builtIn: true);
 				Util.InvokeVoid(Singleton<LoadingManager>.instance, "AddChildrenToBuiltinStyle", GameObject.Find("European Style new"), districtStyle, false);
@@ -251,7 +251,7 @@ namespace LoadingScreenMod
 					{
 						for (int k = 0; k < districtStyleMetaData.assets.Length; k++)
 						{
-							hashSet.Add(districtStyleMetaData.assets[k]);
+							assetnames.Add(districtStyleMetaData.assets[k]);
 						}
 					}
 				}
@@ -269,13 +269,13 @@ namespace LoadingScreenMod
 			Instance<LoadingScreen>.instance.DualSource.Add(L10n.Get(136));
 			Singleton<LoadingManager>.instance.m_loadingProfilerCustomContent.BeginLoading("Calculating asset load order");
 			PrintMem();
-			Package.Asset[] queue = GetLoadQueue(hashSet);
-			Util.DebugPrint("LoadQueue", queue.Length, Profiling.Millis);
+			Package.Asset[] loadQueue = GetLoadQueue(assetnames);
+			Util.DebugPrint("LoadQueue", loadQueue.Length, Profiling.Millis);
 			Singleton<LoadingManager>.instance.m_loadingProfilerCustomContent.EndLoading();
 			Singleton<LoadingManager>.instance.m_loadingProfilerCustomContent.BeginLoading("Loading Custom Assets");
-			Instance<Sharing>.instance.Start(queue);
+			Instance<Sharing>.instance.Start(loadQueue);
 			beginMillis = (lastMillis = Profiling.Millis);
-			for (int k = 0; k < queue.Length; k++)
+			for (int k = 0; k < loadQueue.Length; k++)
 			{
 				if ((k & 0x3F) == 0)
 				{
@@ -283,20 +283,20 @@ namespace LoadingScreenMod
 				}
 				Instance<Sharing>.instance.WaitForWorkers(k);
 				stack.Clear();
-				Package.Asset asset4 = queue[k];
+				Package.Asset asset = loadQueue[k];
 				try
 				{
-					LoadImpl(asset4);
+					LoadImpl(asset);
 				}
 				catch (Exception e)
 				{
-					AssetFailed(asset4, asset4.package, e);
+					AssetFailed(asset, asset.package, e);
 				}
 				if (Profiling.Millis - lastMillis > 350)
 				{
 					lastMillis = Profiling.Millis;
-					progress = 0.15f + (float)(k + 1) * 0.7f / (float)queue.Length;
-					Instance<LoadingScreen>.instance.SetProgress(progress, progress, assetCount, assetCount - k - 1 + queue.Length, beginMillis, lastMillis);
+					progress = 0.15f + (float)(k + 1) * 0.7f / (float)loadQueue.Length;
+					Instance<LoadingScreen>.instance.SetProgress(progress, progress, assetCount, assetCount - k - 1 + loadQueue.Length, beginMillis, lastMillis);
 					yield return null;
 				}
 			}
@@ -541,17 +541,17 @@ namespace LoadingScreenMod
 
 		private Package.Asset[] GetLoadQueue(HashSet<string> styleBuildings)
 		{
-			Package[] fullName = new Package[0];
+			Package[] customPackages = new Package[0];
 			try
 			{
-				fullName = PackageManager.allPackages.Where((Package p) => p.FilterAssets(UserAssetType.CustomAssetMetaData).Any()).ToArray();
-				Array.Sort(fullName, PackageComparison);
+				customPackages = PackageManager.allPackages.Where((Package p) => p.FilterAssets(UserAssetType.CustomAssetMetaData).Any()).ToArray();
+				Array.Sort(customPackages, PackageComparison);
 			}
 			catch (Exception exception)
 			{
 				Debug.LogException(exception);
 			}
-			List<Package.Asset>[] array = new List<Package.Asset>[5]
+			List<Package.Asset>[] assetQueues = new List<Package.Asset>[5]
 			{
 				new List<Package.Asset>(32),
 				new List<Package.Asset>(128),
@@ -560,98 +560,98 @@ namespace LoadingScreenMod
 				new List<Package.Asset>(64)
 			};
 			List<Package.Asset> assets = new List<Package.Asset>(8);
-			HashSet<string> hashSet = new HashSet<string>();
+			HashSet<string> prevAssetNames = new HashSet<string>();
 			string index = string.Empty;
 			SteamHelper.DLC_BitMask indices = ~SteamHelper.GetOwnedDLCMask();
-			bool flag = Settings.settings.loadEnabled & !Settings.settings.enableDisable;
+			bool loadEnabled = Settings.settings.loadEnabled & !Settings.settings.enableDisable;
 			bool loadUsed = Settings.settings.loadUsed;
-			Package[] array2 = fullName;
+			Package[] array2 = customPackages;
 			foreach (Package package in array2)
 			{
-				Package.Asset asset = null;
+				Package.Asset lastAsset = null;
 				try
 				{
 					Instance<CustomDeserializer>.instance.AddPackage(package);
-					Package.Asset asset2 = package.Find(package.packageMainAsset);
+					Package.Asset mainAsset = package.Find(package.packageMainAsset);
 					string packageName = package.packageName;
-					bool flag2 = (flag && IsEnabled(asset2)) || styleBuildings.Contains(asset2.fullName);
-					if (!flag2 && (!loadUsed || !Instance<UsedAssets>.instance.GotPackage(packageName)))
+					bool shouldLoadEnabledAsset = (loadEnabled && IsEnabled(mainAsset)) || styleBuildings.Contains(mainAsset.fullName);
+					if (!shouldLoadEnabledAsset && (!loadUsed || !Instance<UsedAssets>.instance.GotPackage(packageName)))
 					{
 						continue;
 					}
-					CustomAssetMetaData assetRefs = GetAssetRefs(asset2, assets);
+					CustomAssetMetaData assetMetadata = GetAssetRefs(mainAsset, assets);
 					int count = assets.Count;
-					asset = assets[count - 1];
-					CustomAssetMetaData.Type type = typeMap[(int)assetRefs.type];
+					lastAsset = assets[count - 1];
+					CustomAssetMetaData.Type type = typeMap[(int)assetMetadata.type];
 					packageTypes.Add(package, type);
-					bool flag3 = loadUsed && Instance<UsedAssets>.instance.IsUsed(asset, type);
-					flag2 = flag2 && (AssetImporterAssetTemplate.GetAssetDLCMask(assetRefs) & indices) == 0;
-					if (count > 1 && !flag3 && loadUsed)
+					bool shouldLoadUsedasset = loadUsed && Instance<UsedAssets>.instance.IsUsed(lastAsset, type);
+					shouldLoadEnabledAsset = shouldLoadEnabledAsset && (AssetImporterAssetTemplate.GetAssetDLCMask(assetMetadata) & indices) == 0;
+					if (count > 1 && !shouldLoadUsedasset && loadUsed)
 					{
 						for (int j = 0; j < count - 1; j++)
 						{
 							if ((type != CustomAssetMetaData.Type.Road && Instance<UsedAssets>.instance.IsUsed(assets[j], type)) || (type == CustomAssetMetaData.Type.Road && Instance<UsedAssets>.instance.IsUsed(assets[j], CustomAssetMetaData.Type.Road, CustomAssetMetaData.Type.Building)))
 							{
-								flag3 = true;
+								shouldLoadUsedasset = true;
 								break;
 							}
 						}
 					}
-					if (!(flag2 || flag3))
+					if (!(shouldLoadEnabledAsset || shouldLoadUsedasset))
 					{
 						continue;
 					}
 					if (recordAssets)
 					{
-						Instance<Reports>.instance.AddPackage(asset, type, flag2, flag3);
+						Instance<Reports>.instance.AddPackage(lastAsset, type, shouldLoadEnabledAsset, shouldLoadUsedasset);
 					}
 					if (packageName != index)
 					{
 						index = packageName;
-						hashSet.Clear();
+						prevAssetNames.Clear();
 					}
-					List<Package.Asset> list = array[loadQueueIndex[(int)type]];
+					List<Package.Asset> queue = assetQueues[loadQueueIndex[(int)type]];
 					for (int k = 0; k < count - 1; k++)
 					{
-						Package.Asset asset3 = assets[k];
-						if (hashSet.Add(asset3.name) || !IsDuplicate(asset3, type, array, isMainAssetRef: false))
+						Package.Asset asset = assets[k];
+						if (prevAssetNames.Add(asset.name) || !IsDuplicate(asset, type, assetQueues, isMainAssetRef: false))
 						{
-							list.Add(asset3);
+							queue.Add(asset);
 						}
 					}
-					if (hashSet.Add(asset.name) || !IsDuplicate(asset, type, array, isMainAssetRef: true))
+					if (prevAssetNames.Add(lastAsset.name) || !IsDuplicate(lastAsset, type, assetQueues, isMainAssetRef: true))
 					{
-						list.Add(asset);
+						queue.Add(lastAsset);
 						if (hasAssetDataExtensions)
 						{
-							metaDatas[asset.fullName] = new SomeMetaData(assetRefs.userDataRef, assetRefs.name);
+							metaDatas[lastAsset.fullName] = new SomeMetaData(assetMetadata.userDataRef, assetMetadata.name);
 						}
 						if (type == CustomAssetMetaData.Type.Citizen)
 						{
-							citizenMetaDatas[asset.fullName] = assetRefs;
+							citizenMetaDatas[lastAsset.fullName] = assetMetadata;
 						}
 					}
 				}
 				catch (Exception e)
 				{
-					AssetFailed(asset, package, e);
+					AssetFailed(lastAsset, package, e);
 				}
 			}
 			CheckSuspects();
-			hashSet.Clear();
-			hashSet = null;
-			Package.Asset[] i = new Package.Asset[array.Sum((List<Package.Asset> lst) => lst.Count)];
+			prevAssetNames.Clear();
+			prevAssetNames = null;
+			Package.Asset[] finalQueue = new Package.Asset[assetQueues.Sum(queue_ => queue_.Count)];
 			int l = 0;
-			int num = 0;
-			for (; l < array.Length; l++)
+			int pointer = 0;
+			for (; l < assetQueues.Length; l++)
 			{
-				array[l].CopyTo(i, num);
-				num += array[l].Count;
-				array[l].Clear();
-				array[l] = null;
+				assetQueues[l].CopyTo(finalQueue, pointer);
+				pointer += assetQueues[l].Count;
+				assetQueues[l].Clear();
+				assetQueues[l] = null;
 			}
-			array = null;
-			return i;
+			assetQueues = null;
+			return finalQueue;
 		}
 
 		private static CustomAssetMetaData GetAssetRefs(Package.Asset mainAsset, List<Package.Asset> assetRefs)
