@@ -153,7 +153,10 @@ namespace LoadingScreenMod
 				loadingManager.m_loadingProfilerMain.Reset();
 				loadingManager.m_loadingProfilerSimulation.Reset();
 				loadingManager.m_loadingProfilerScenes.Reset();
-				return loadingManager.StartCoroutine(flag ? Instance<LevelLoader>.instance.LoadLevelCoroutine(asset, playerScene, uiScene, ngs, forceEnvironmentReload) : ((IEnumerator)Util.Invoke(loadingManager, "LoadLevelCoroutine", asset, playerScene, uiScene, ngs, forceEnvironmentReload)));
+				return loadingManager.StartCoroutine(
+					flag ? 
+					Instance<LevelLoader>.instance.LoadLevelCoroutine(asset, playerScene, uiScene, ngs, forceEnvironmentReload) 
+					: ((IEnumerator)Util.Invoke(loadingManager, "LoadLevelCoroutine", asset, playerScene, uiScene, ngs, forceEnvironmentReload)));
 			}
 			return null;
 		}
